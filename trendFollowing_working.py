@@ -2,7 +2,9 @@ import numpy as np
 from sklearn import svm
 from sklearn import linear_model
 from sklearn.preprocessing import PolynomialFeatures
+from scipy.stats import pearsonr
 
+#main driving function 
 def myTradingSystem(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings):
     ''' This system uses trend following techniques to allocate capital into the desired equities'''
     settings['day'] += 1
@@ -39,6 +41,23 @@ def myTradingSystem(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, setting
     elif settings['strategy'] =="linreg":
         return linear_regression(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings)
 
+    elif settings['strategy'] =="bollinger":
+        nMarkets = len(settings['markets'])
+        threshold = settings['threshold']
+        pos = np.zeros((1, nMarkets), dtype=np.float)
+
+        for market in range(nMarkets):
+            sma, upperBand, lowerBand = bollingerBands(CLOSE[:, market])
+            currentPrice = CLOSE[-1, market]
+
+            if currentPrice >= upperBand + (upperBand - lowerBand) * threshold:
+                pos[0, market] = -1
+            elif currentPrice <= lowerBand - (upperBand - lowerBand) * threshold:
+                pos[0, market] = 1
+
+        return pos, settings
+
+#linear reg train test?
 def linear_regression(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings):
     nMarkets = len(settings['markets'])
     lookback = settings['lookback']
@@ -65,8 +84,6 @@ def linear_regression(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, setti
     return pos, settings
 
 
-
-
 def stochastic_osc(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings):
     nMarkets = CLOSE.shape[1]
     lowestLow=LOW.min()
@@ -84,6 +101,11 @@ def stochastic_osc(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings
     weights = pos/np.nansum(abs(pos))
 
     return weights, settings
+
+def bollingerBands(a, n=20):
+        sma = np.nansum(a[-n:]) / n
+        std = np.std(a[-n:], ddof=1)
+        return sma, sma + 2 * std, sma - 2 * std
 
 
 def predict(momentum, CLOSE, lookback, gap, dimension):
