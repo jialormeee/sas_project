@@ -1,5 +1,7 @@
 import numpy as np 
 from sklearn import svm
+from sklearn import linear_model
+from sklearn.preprocessing import PolynomialFeatures
 
 def myTradingSystem(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings):
     ''' This system uses trend following techniques to allocate capital into the desired equities'''
@@ -33,7 +35,38 @@ def myTradingSystem(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, setting
     
     elif settings['strategy'] =="stoch":
         return stochastic_osc(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings)
-    
+
+    elif settings['strategy'] =="linreg":
+        return linear_regression(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings)
+
+def linear_regression(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings):
+    nMarkets = len(settings['markets'])
+    lookback = settings['lookback']
+    dimension = settings['dimension']
+    threshold = settings['threshold']
+    pos = np.zeros(nMarkets, dtype=np.float)
+
+    poly = PolynomialFeatures(degree=dimension)
+    for market in range(nMarkets):
+        reg = linear_model.LinearRegression()
+        try:
+            reg.fit(poly.fit_transform(np.arange(lookback).reshape(-1, 1)), CLOSE[:, market])
+            trend = (reg.predict(poly.fit_transform(np.array([[lookback]]))) - CLOSE[-1, market]) / CLOSE[-1, market]
+
+            if abs(trend[0]) < threshold:
+                trend[0] = 0
+
+            pos[market] = np.sign(trend)
+
+        # for NaN data set position to 0
+        except ValueError:
+            pos[market] = .0
+
+    return pos, settings
+
+
+
+
 def stochastic_osc(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings):
     nMarkets = CLOSE.shape[1]
     lowestLow=LOW.min()
@@ -63,7 +96,7 @@ def predict(momentum, CLOSE, lookback, gap, dimension):
 
     return clf.predict(momentum[-dimension:].T)
 
-
+#original model given by quantiacs 
 def trend_following(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings):
     periodLonger = 200
     periodShorter = 40
@@ -82,8 +115,6 @@ def trend_following(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, setting
     weights = pos / np.nansum(abs(pos))
 
     return weights, settings
-
-
 
 
 def mySettings():
@@ -120,7 +151,8 @@ def mySettings():
                 'day': 0,
                 'gap': 20,
                 'dimension': 5,
-                'strategy': 'stoch',
+                'threshold': 0.2,
+                'strategy': 'linreg',
                 }
 
     return settings
