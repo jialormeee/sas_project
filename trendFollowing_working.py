@@ -7,7 +7,7 @@ import ta
 
 #main driving function 
 def myTradingSystem(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings):
-    ''' This system uses trend following techniques to allocate capital into the desired equities'''
+    
     settings['day'] += 1
     print(DATE[-1])
     nMarkets = CLOSE.shape[1]
@@ -36,9 +36,6 @@ def myTradingSystem(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, setting
             pos = pos / np.nansum(abs(pos))
         return pos, settings
     
-    elif settings['strategy'] =="stoch":
-        return stochastic_osc(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings)
-
     elif settings['strategy'] =="linreg":
         return linear_regression(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings)
 
@@ -55,9 +52,85 @@ def myTradingSystem(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, setting
                 pos[0, market] = -1
             elif currentPrice <= lowerBand - (upperBand - lowerBand) * threshold:
                 pos[0, market] = 1
-
         return pos, settings
     
+    elif settings['strategy'] =="fib_rec":
+        return fib_retrac(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings)
+
+    elif settings['strategy'] =="volume_method":
+        return avg6mthvol(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings)
+
+def avg6mthvol(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings):
+    period = int(365/2)
+    #find top vol over period of 1/2 year and return corresponding market
+    
+    nMarkets = len(settings['markets'])
+    pos = np.zeros((1, nMarkets), dtype=np.float)
+
+    latestVol = VOL[-period:, :]
+    #find average volume over 6 mth per market
+    aveVol = np.mean(latestVol,axis=0) # list of nMaekts with average over prev days 
+    
+    #find average volume over 6 mth per market s
+    aveVol = np.mean(latestVol,axis=0) # list of nMaekts with average over prev days 
+    longE = np.where(aveVol == np.nanmax(aveVol))
+    shortE = np.where(aveVol == np.nanmin(aveVol))
+
+    pos[0,longE[0]] = 1
+    pos[0,shortE[0]] = -1
+    
+    weights = pos/np.nansum(abs(pos))
+    return weights, settings
+
+def fib_retrac(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings):
+    nMarkets=CLOSE.shape[1]
+    
+    periodLonger=300 #%[280:30:500]
+    maxminPeriod=60 
+    price_min = np.nanmin(CLOSE[-maxminPeriod,:],axis=0)
+    price_max = np.nanmax(CLOSE[-maxminPeriod,:])
+    pos = np.zeros((1, nMarkets), dtype=np.float)
+    diff = price_max - price_min
+
+    extremeRange = price_max - price_min
+    hundred = extremeRange - price_min
+    up_level1 = price_max - 0.236 * diff
+    up_level2 = price_max - 0.382 * diff
+    up_level3 = price_max - 0.618 * diff
+
+    
+    hundred_down = extremeRange + price_min
+    down_level1 = price_min + 0.236 * diff
+    down_level2 = price_min + 0.382 * diff
+    down_level3 = price_min + 0.618 * diff
+
+    for market in range(nMarkets):
+        smaLongerPeriod = np.sum(CLOSE[-periodLonger:,market])/periodLonger
+        
+        currentPrice = CLOSE[-1, market]
+
+        if currentPrice > smaLongerPeriod and currentPrice<hundred:
+            pos[0, market] = -1
+        elif currentPrice > smaLongerPeriod and currentPrice<up_level3:
+            pos[0, market] = -0.6           
+        elif currentPrice > smaLongerPeriod and currentPrice<up_level2:
+            pos[0, market] = -0.5
+        elif currentPrice > smaLongerPeriod and currentPrice<up_level1:
+            pos[0, market] = -0.3
+        else:
+            if currentPrice < smaLongerPeriod and currentPrice>hundred_down:
+                pos[0, market] = 1
+            elif currentPrice < smaLongerPeriod and currentPrice>down_level3:
+                pos[0, market] = 0.6           
+            elif currentPrice < smaLongerPeriod and currentPrice>down_level2:
+                pos[0, market] = 0.5
+            elif currentPrice < smaLongerPeriod and currentPrice>down_level1:
+                pos[0, market] = 0.3
+
+
+    weights = pos/np.nansum(abs(pos))
+
+    return (weights, settings)
 
 #quantiacs sample code also
 def linear_regression(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings):
@@ -84,32 +157,6 @@ def linear_regression(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, setti
             pos[market] = .0
 
     return pos, settings
-
-def SMA(closes, order):
-    SMAs = [None]*(order-1)
-    for j in range(order, (len(closes)+1)):
-        SMAs.append(np.nanmean(closes[(j-order):j]))
-    return SMAs
-
-
-#non-quantiacs code 
-def stochastic_osc(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings):
-    nMarkets = CLOSE.shape[1]
-    lowestLow=LOW.min()
-    highestHigh=HIGH.max()
-
-    todayClose=CLOSE[200]
-    stoch=(todayClose-lowestLow)/(highestHigh-lowestLow)*100
-    longEquity=stoch>99
-    shortEquity= ~longEquity
-
-    pos=np.zeros(nMarkets)
-    pos[longEquity]=1
-    pos[shortEquity]=-1
-
-    weights = pos/np.nansum(abs(pos))
-
-    return weights, settings
 
 #quantiacs sample code also
 def bollingerBands(a, n=20):
@@ -185,7 +232,7 @@ def mySettings():
                 'gap': 20,
                 'dimension': 5,
                 'threshold': 0.2, ##only bollinger and linreg use threshold
-                'strategy': 'ADI', ## strategy: sma, svm, bollinger, stoch, linreg
+                'strategy': 'volume_method', ## strategy: sma, svm, bollinger, fib_rec, linreg
                 }
 
     return settings
