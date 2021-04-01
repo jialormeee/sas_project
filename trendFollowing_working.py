@@ -1,7 +1,9 @@
 import numpy as np 
+import pandas as pd 
 from sklearn import svm
 from sklearn import linear_model
 from sklearn.preprocessing import PolynomialFeatures
+import ta
 
 #main driving function 
 def myTradingSystem(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings):
@@ -55,6 +57,7 @@ def myTradingSystem(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, setting
                 pos[0, market] = 1
 
         return pos, settings
+    
 
 #quantiacs sample code also
 def linear_regression(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings):
@@ -81,6 +84,13 @@ def linear_regression(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, setti
             pos[market] = .0
 
     return pos, settings
+
+def SMA(closes, order):
+    SMAs = [None]*(order-1)
+    for j in range(order, (len(closes)+1)):
+        SMAs.append(np.nanmean(closes[(j-order):j]))
+    return SMAs
+
 
 #non-quantiacs code 
 def stochastic_osc(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings):
@@ -175,7 +185,7 @@ def mySettings():
                 'gap': 20,
                 'dimension': 5,
                 'threshold': 0.2, ##only bollinger and linreg use threshold
-                'strategy': 'linreg', ## strategy: sma, svm, bollinger, stoch, linreg
+                'strategy': 'ADI', ## strategy: sma, svm, bollinger, stoch, linreg
                 }
 
     return settings
