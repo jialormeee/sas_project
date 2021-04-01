@@ -2,7 +2,6 @@ import numpy as np
 from sklearn import svm
 from sklearn import linear_model
 from sklearn.preprocessing import PolynomialFeatures
-from scipy.stats import pearsonr
 
 #main driving function 
 def myTradingSystem(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings):
@@ -57,7 +56,7 @@ def myTradingSystem(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, setting
 
         return pos, settings
 
-#linear reg train test?
+#quantiacs sample code also
 def linear_regression(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings):
     nMarkets = len(settings['markets'])
     lookback = settings['lookback']
@@ -83,7 +82,7 @@ def linear_regression(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, setti
 
     return pos, settings
 
-
+#non-quantiacs code 
 def stochastic_osc(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings):
     nMarkets = CLOSE.shape[1]
     lowestLow=LOW.min()
@@ -102,12 +101,13 @@ def stochastic_osc(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings
 
     return weights, settings
 
+#quantiacs sample code also
 def bollingerBands(a, n=20):
         sma = np.nansum(a[-n:]) / n
         std = np.std(a[-n:], ddof=1)
         return sma, sma + 2 * std, sma - 2 * std
 
-
+#quantiacs sample code also
 def predict(momentum, CLOSE, lookback, gap, dimension):
     X = np.concatenate([momentum[i:i + dimension] for i in range(lookback - gap - dimension)], axis=1).T
     y = np.sign((CLOSE[dimension+gap:] - CLOSE[dimension+gap-1:-1]).T[0])
@@ -165,6 +165,7 @@ def mySettings():
 
     dates = train_date if MODE == "TRAIN" else test_date
 
+
     settings = {'markets': markets,
                 'lookback': 504,
                 'budget': 10 ** 6,
@@ -173,8 +174,8 @@ def mySettings():
                 'day': 0,
                 'gap': 20,
                 'dimension': 5,
-                'threshold': 0.2,
-                'strategy': 'linreg',
+                'threshold': 0.2, ##only bollinger and linreg use threshold
+                'strategy': 'linreg', ## strategy: sma, svm, bollinger, stoch, linreg
                 }
 
     return settings
