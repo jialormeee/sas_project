@@ -5,6 +5,8 @@ from sklearn import svm
 from sklearn import linear_model
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.linear_model import LinearRegression
+from pmdarima.arima import auto_arima
+import pickle
 
 #main driving function 
 def myTradingSystem(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings):
@@ -81,6 +83,9 @@ def myTradingSystem(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, setting
                 pos[i+1] = -1
         weights = pos/np.nansum(abs(pos))
         return (weights, settings)
+
+    elif settings['model'] == 'sarima':
+        return sarima(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings)
 
 #on-balance vol indicator
 def OBV(closes, volumes):
@@ -272,6 +277,34 @@ def technicals(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings):
     
     return pos, settings
 
+def sarima(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings):
+
+    nMarkets = CLOSE.shape[1]
+    markets = settings['markets']
+    pos= np.zeros(nMarkets)
+    sarima_models = settings['sarima']
+    
+    for i in range(1, nMarkets):
+        model = sarima_models[settings['markets'][i]].fit(np.log(CLOSE[-50:, i]))
+        fore = model.predict(1)[0]
+        if fore > np.log(CLOSE[-1, i]):
+            pos[i] = 1
+        else:
+            pos[i] = -1
+
+    f = open('weights_list_sarima.txt', 'r')
+    weights_list = []
+    line = f.readline()
+    while len(line) != 0:
+        weights_list.append(int(line.strip()))
+        line = f.readline()
+
+    weights = np.zeros(nMarkets)
+    for i in range(1, nMarkets):
+        weights[i] = pos[i]*weights_list[i]/sum(weights_list)
+
+    return weights, settings
+
 def mySettings():
     ''' Define your trading system settings here '''
     markets = ['CASH', 'F_AD', 'F_BO', 'F_BP', 'F_C', 'F_CC', 'F_CD', 'F_CL', 'F_CT', 
@@ -307,9 +340,14 @@ def mySettings():
                 'gap': 20,
                 'dimension': 5,
                 'threshold': 0.2, ##only bollinger and linreg use threshold
-                'model': 'fib_rec' ## model: fib_rec, technicals, 
+                'model': 'sarima' ## model: fib_rec, technicals, 
                 }
-    
+
+    if settings['model'] == 'sarima':
+        with open('sarima_models.pckl', 'rb') as f:
+            sarima_models = pickle.load(f)
+
+        settings['sarima'] = sarima_models
 
     return settings
 
