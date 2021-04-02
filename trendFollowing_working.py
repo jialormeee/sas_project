@@ -12,8 +12,8 @@ def myTradingSystem(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, setting
     print(DATE[-1])
     nMarkets = CLOSE.shape[1]
 
-    if settings['strategy'] =="sma":
-        return trend_following(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings)
+    if settings['strategy'] =="technicals":
+        return technicals(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings)
 
     elif settings['strategy'] =="svm":
         lookback = settings['lookback']
@@ -59,6 +59,8 @@ def myTradingSystem(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, setting
 
     elif settings['strategy'] =="volume_method":
         return avg6mthvol(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings)
+
+
 
 def avg6mthvol(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings):
     period = int(365/2)
@@ -175,26 +177,99 @@ def predict(momentum, CLOSE, lookback, gap, dimension):
 
     return clf.predict(momentum[-dimension:].T)
 
-#original model given by quantiacs 
-def trend_following(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings):
-    periodLonger = 200
-    periodShorter = 40
-    nMarkets = CLOSE.shape[1]
-    # Calculate Simple Moving Average (SMA)
-    smaLongerPeriod = np.nansum(CLOSE[-periodLonger:, :], axis=0) / periodLonger
-    smaShorterPeriod = np.nansum(CLOSE[-periodShorter:, :], axis=0) / periodShorter
+#added technicals yq
+def technicals(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings):
+    nMarkets=CLOSE.shape[1]
+    pos=np.zeros(nMarkets)
+    CLOSE = np.transpose(CLOSE)
+    VOL = np.transpose(VOL)
+    # SMA
+    '''
+    Baseline indicator
+    Compare short-term (sma50) and long-term (sma200) price.
+    '''
+    sma200=np.nansum(CLOSE[:,-200:],axis=1)/200 
+    sma50=np.nansum(CLOSE[:,-50:],axis=1)/50
+    
 
-    longEquity = smaShorterPeriod > smaLongerPeriod
-    shortEquity = ~longEquity
+    # MACD
+    '''
+    Trend indicator
+    If the MACD lines are above zero for a sustained period of time,
+    the stock is likely trending upwards. Conversely,
+    if the MACD lines are below zero for a sustained period of time,
+    the trend is likely down.
+    '''
+    def MACD(closes):
+        return list(ta.trend.macd(pd.Series(closes)))
 
-    pos = np.zeros(nMarkets)
+    MACDs = [MACD(close) for close in CLOSE]
+    MACDs = np.array([np.array(a) for a in MACDs])
+    
+
+    # OBV
+    '''
+    Trend indicator
+    A rising price should be accompanied by a rising OBV;
+    a falling price should be accompanied by a falling OBV.
+    '''
+    def OBV(closes, volumes):
+        return list(ta.volume.OnBalanceVolumeIndicator(pd.Series(closes), pd.Series(volumes)).on_balance_volume())
+
+    OBVs = [OBV(close,vol) for close,vol in zip(CLOSE,VOL)]
+    OBVs = np.array([np.array(a) for a in OBVs])
+    
+
+    # RSI
+    '''
+    Momentum indicator
+    One way to interpret the RSI is by viewing the price as overbought
+    when the indicator in the histogram is above 70,
+    and viewing the price as oversold when the indicator is below 30.
+    '''
+    
+    def RSI(closes):
+        return list(ta.momentum.RSIIndicator(pd.Series(closes)).rsi())
+
+    RSIs = [RSI(close) for close in CLOSE]
+    RSIs = np.array([np.array(a) for a in RSIs])
+    
+    
+    # BB
+    '''
+    Volatility indicator, allowing price to move within a range.
+    But if the price is closer to the higher band, it is considered overbought.
+    If the price is closer to the lower band, it is considered oversold.
+    '''
+    def BB_high(closes, period):
+        return list(ta.volatility.BollingerBands(pd.Series(closes), period).bollinger_hband_indicator())
+
+    def BB_low(closes, period):
+        return list(ta.volatility.BollingerBands(pd.Series(closes), period).bollinger_lband_indicator())
+
+    BBHs = [BB_high(close,20) for close in CLOSE]
+    BBHs = np.array([np.array(a) for a in BBHs])
+
+    BBLs = [BB_low(close,20) for close in CLOSE]
+    BBLs = np.array([np.array(a) for a in BBLs])
+
+
+    # Trading Strategy
+    '''
+    Look at the following:
+    baseline is sma50>sma200
+    identify upward trend using MACD and OBV
+    identify oversold market using RSI and BB
+    buy if either baseline or upward trend or oversold is satisfied.
+    '''
+    uptrend = np.logical_or(np.all(MACDs[:,-7:] > 0), OBVs[:,-1] > OBVs[:,-2])
+    oversold = np.logical_or(RSIs[:,-1] < 30, BBLs[:,-1]==1)
+    longEquity = np.logical_or(sma50 > sma200, oversold, uptrend)
+
     pos[longEquity] = 1
-    pos[shortEquity] = -1
-
-    weights = pos / np.nansum(abs(pos))
-
-    return weights, settings
-
+    pos[~longEquity] = -1
+    
+    return pos, settings
 
 def mySettings():
     ''' Define your trading system settings here '''
@@ -232,7 +307,7 @@ def mySettings():
                 'gap': 20,
                 'dimension': 5,
                 'threshold': 0.2, ##only bollinger and linreg use threshold
-                'strategy': 'volume_method', ## strategy: sma, svm, bollinger, fib_rec, linreg
+                'strategy': 'technicals', ## strategy: sma, svm, bollinger, fib_rec, linreg
                 }
 
     return settings
