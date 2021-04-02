@@ -1,18 +1,18 @@
 import numpy as np 
 import pandas as pd 
+import ta
 from sklearn import svm
 from sklearn import linear_model
 from sklearn.preprocessing import PolynomialFeatures
-import ta
+from sklearn.linear_model import LinearRegression
 
 #main driving function 
 def myTradingSystem(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings):
     
     settings['day'] += 1
-    print(DATE[-1])
+    #print(DATE[-1])
     nMarkets = CLOSE.shape[1]
-
-    print("Using data from {} onwards to predict/take position in {}".format(DATE[0],DATE[-1]))
+    #print("Using data from {} onwards to predict/take position in {}".format(DATE[0],DATE[-1]))
 
     if settings['model'] =="technicals":
         return technicals(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings)
@@ -60,51 +60,53 @@ def myTradingSystem(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, setting
         return fib_retrac(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings)
 
     elif settings['model'] =="volume_method":
-        return avg6mthvol(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings)
+        nMarkets=CLOSE.shape[1]
+        pos = np.zeros(nMarkets)
+        OBVs = [OBV(close,vol) for close,vol in zip(CLOSE,VOL)]
+        ###
+        def bullish_trend(obv):
+            return (obv[-1] > obv[-2]) and (obv[-2] > obv[-3])
+        def bearish_trend(obv):
+            return (obv[-1] < obv[-2]) and (obv[-2] < obv[-3])
 
+        OBV_bull = [True if bullish_trend(obv) else False for obv in OBVs]
+        OBV_bear = [True if bearish_trend(obv) else False for obv in OBVs]
+        
+        for i in range(0, nMarkets):
+            # if bullish take long position
+            if OBV_bull[i] == True:
+                pos[i+1] = 1
+            # if bearish take short position
+            elif OBV_bear[i] == True:
+                pos[i+1] = -1
+        weights = pos/np.nansum(abs(pos))
+        return (weights, settings)
 
-def avg6mthvol(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings):
-    period = int(365/2)
-    #find top vol over period of 1/2 year and return corresponding market
-    
-    nMarkets = len(settings['markets'])
-    pos = np.zeros((1, nMarkets), dtype=np.float)
+#on-balance vol indicator
+def OBV(closes, volumes):
+    return list(ta.volume.OnBalanceVolumeIndicator(pd.Series(closes), pd.Series(volumes)).on_balance_volume())
 
-    latestVol = VOL[-period:, :]
-    #find average volume over 6 mth per market
-    avgVol = np.mean(latestVol,axis=0) # list of nMaekts with average over prev days 
-    
-    #find average volume over 6 mth per market s
-    avgVol = np.mean(latestVol,axis=0) # list of nMaekts with average over prev days 
-    longE = np.where(avgVol == np.nanmax(avgVol))
-    shortE = np.where(avgVol == np.nanmin(avgVol))
-
-    pos[0,longE[0]] = 1
-    pos[0,shortE[0]] = -1
-    
-    weights = pos/np.nansum(abs(pos))
-    return weights, settings
-
+#fib-retracement 
 def fib_retrac(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings):
     nMarkets=CLOSE.shape[1]
     periodLonger=10 #%[280:30:500]
-    maxminPeriod=60 
-    price_min = np.nanmin(CLOSE[-maxminPeriod,:],axis=0)
-    price_max = np.nanmax(CLOSE[-maxminPeriod,:])
+    maxminPeriod=30 
+    swing_low = np.nanmin(CLOSE[-maxminPeriod,:],axis=0)
+    swing_high = np.nanmax(CLOSE[-maxminPeriod,:])
     pos = np.zeros((1, nMarkets), dtype=np.float)
-    diff = price_max - price_min
+    diff = swing_high - swing_low
 
-    extremeRange = price_max - price_min
-    hundred = extremeRange - price_min
-    up_level1 = price_max - 0.236 * diff
-    up_level2 = price_max - 0.382 * diff
-    up_level3 = price_max - 0.618 * diff
+    extremeRange = swing_high - swing_low
+    hundred = extremeRange - swing_low
+    up_level1 = swing_high - 0.236 * diff
+    up_level2 = swing_high - 0.382 * diff
+    up_level3 = swing_high - 0.618 * diff
 
     
-    hundred_down = extremeRange + price_min
-    down_level1 = price_min + 0.236 * diff
-    down_level2 = price_min + 0.382 * diff
-    down_level3 = price_min + 0.618 * diff
+    hundred_down = extremeRange + swing_low
+    down_level1 = swing_low + 0.236 * diff
+    down_level2 = swing_low + 0.382 * diff
+    down_level3 = swing_low + 0.618 * diff
 
     for market in range(nMarkets):
         smaLongerPeriod = np.sum(CLOSE[-periodLonger:,market])/periodLonger
@@ -131,7 +133,6 @@ def fib_retrac(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings):
 
 
     weights = pos/np.nansum(abs(pos))
-
     return (weights, settings)
 
 #quantiacs sample code also
@@ -297,7 +298,6 @@ def mySettings():
 
     dates = train_date if MODE == "TRAIN" else test_date
 
-
     settings = {'markets': markets,
                 'lookback': 504,
                 'budget': 10 ** 6,
@@ -307,8 +307,9 @@ def mySettings():
                 'gap': 20,
                 'dimension': 5,
                 'threshold': 0.2, ##only bollinger and linreg use threshold
-                'model': 'fib_rec' ## model: sma, svm, bollinger, fib_rec, linreg
+                'model': 'fib_rec' ## model: fib_rec, technicals, 
                 }
+    
 
     return settings
 
