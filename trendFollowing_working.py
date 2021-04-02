@@ -12,10 +12,12 @@ def myTradingSystem(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, setting
     print(DATE[-1])
     nMarkets = CLOSE.shape[1]
 
-    if settings['strategy'] =="technicals":
+    print("Using data from {} onwards to predict/take position in {}".format(DATE[0],DATE[-1]))
+
+    if settings['model'] =="technicals":
         return technicals(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings)
 
-    elif settings['strategy'] =="svm":
+    elif settings['model'] =="svm":
         lookback = settings['lookback']
         dimension = settings['dimension']
         gap = settings['gap']
@@ -36,10 +38,10 @@ def myTradingSystem(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, setting
             pos = pos / np.nansum(abs(pos))
         return pos, settings
     
-    elif settings['strategy'] =="linreg":
+    elif settings['model'] =="linreg":
         return linear_regression(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings)
 
-    elif settings['strategy'] =="bollinger":
+    elif settings['model'] =="bollinger":
         nMarkets = len(settings['markets'])
         threshold = settings['threshold']
         pos = np.zeros((1, nMarkets), dtype=np.float)
@@ -54,12 +56,11 @@ def myTradingSystem(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, setting
                 pos[0, market] = 1
         return pos, settings
     
-    elif settings['strategy'] =="fib_rec":
+    elif settings['model'] =="fib_rec":
         return fib_retrac(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings)
 
-    elif settings['strategy'] =="volume_method":
+    elif settings['model'] =="volume_method":
         return avg6mthvol(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings)
-
 
 
 def avg6mthvol(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings):
@@ -71,12 +72,12 @@ def avg6mthvol(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings):
 
     latestVol = VOL[-period:, :]
     #find average volume over 6 mth per market
-    aveVol = np.mean(latestVol,axis=0) # list of nMaekts with average over prev days 
+    avgVol = np.mean(latestVol,axis=0) # list of nMaekts with average over prev days 
     
     #find average volume over 6 mth per market s
-    aveVol = np.mean(latestVol,axis=0) # list of nMaekts with average over prev days 
-    longE = np.where(aveVol == np.nanmax(aveVol))
-    shortE = np.where(aveVol == np.nanmin(aveVol))
+    avgVol = np.mean(latestVol,axis=0) # list of nMaekts with average over prev days 
+    longE = np.where(avgVol == np.nanmax(avgVol))
+    shortE = np.where(avgVol == np.nanmin(avgVol))
 
     pos[0,longE[0]] = 1
     pos[0,shortE[0]] = -1
@@ -86,8 +87,7 @@ def avg6mthvol(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings):
 
 def fib_retrac(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings):
     nMarkets=CLOSE.shape[1]
-    
-    periodLonger=300 #%[280:30:500]
+    periodLonger=10 #%[280:30:500]
     maxminPeriod=60 
     price_min = np.nanmin(CLOSE[-maxminPeriod,:],axis=0)
     price_max = np.nanmax(CLOSE[-maxminPeriod,:])
@@ -307,7 +307,7 @@ def mySettings():
                 'gap': 20,
                 'dimension': 5,
                 'threshold': 0.2, ##only bollinger and linreg use threshold
-                'strategy': 'technicals', ## strategy: sma, svm, bollinger, fib_rec, linreg
+                'model': 'fib_rec' ## model: sma, svm, bollinger, fib_rec, linreg
                 }
 
     return settings
