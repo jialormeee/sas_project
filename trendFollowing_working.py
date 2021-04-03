@@ -1,20 +1,21 @@
 import numpy as np 
 import pandas as pd 
 import ta
+import statistics as st
 from sklearn import svm
 from sklearn import linear_model
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.linear_model import LinearRegression
-from pmdarima.arima import auto_arima
+#from pmdarima.arima import auto_arima
 import pickle
 
 #main driving function 
 def myTradingSystem(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings):
     
     settings['day'] += 1
-    print(DATE[-1])
+    #print(DATE[-1])
     nMarkets = CLOSE.shape[1]
-    #print("Using data from {} onwards to predict/take position in {}".format(DATE[0],DATE[-1]))
+    print("Using data from {} onwards to predict/take position in {}".format(DATE[0],DATE[-1]))
 
     if settings['model'] =="technicals":
         return technicals(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings)
@@ -65,7 +66,6 @@ def myTradingSystem(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, setting
         nMarkets=CLOSE.shape[1]
         pos = np.zeros(nMarkets)
         OBVs = [OBV(close,vol) for close,vol in zip(CLOSE,VOL)]
-        ###
         def bullish_trend(obv):
             return (obv[-1] > obv[-2]) and (obv[-2] > obv[-3])
         def bearish_trend(obv):
@@ -86,6 +86,40 @@ def myTradingSystem(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, setting
 
     elif settings['model'] == 'sarima':
         return sarima(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings)
+
+    elif settings['model'] == 'moment':
+        return moment(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings)
+
+def moment(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings):
+    nMarkets=CLOSE.shape[1]
+    lookback=150
+    pos = np.zeros((1, nMarkets), dtype=np.float)
+    for market in range(nMarkets):
+        
+        sma_mean = np.mean(np.sum(CLOSE[-lookback:,market])/lookback)
+        sma_var = st.stdev(CLOSE[-lookback:, market])
+        pastPrice= CLOSE[-lookback,market]
+        currentPrice = CLOSE[-1, market]       
+        
+        ###seeing some price weakness
+        if currentPrice<pastPrice:
+            ### seeing that price is lower than mean, downward trend, take heavy short position
+            if currentPrice < sma_mean:
+                pos[0, market] = -1
+            ### seeing that price is lower than mean-var, downward trend but slightly more risk-averse, take slightly heavy short position
+            elif currentPrice < sma_mean - sma_var:
+                pos[0, market] = -0.75
+        ### seeing some price strength
+        elif currentPrice > pastPrice:
+            ### seeing that price is higher than mean, upward trend, take heavy long position
+            if currentPrice > sma_mean:
+                pos[0, market] = 1
+            ### seeing that price is higher than mean + var, upward trend but slightly more risk-averse, take slightly heavy long position
+            elif currentPrice > sma_mean + sma_var:
+                pos[0, market] = 0.75
+
+    weights = pos/np.nansum(abs(pos))
+    return (weights, settings)
 
 #on-balance vol indicator
 def OBV(closes, volumes):
@@ -318,7 +352,6 @@ def mySettings():
     # MODE = "TEST" / "TRAIN"
     MODE = "TEST"
 
-
     train_date = {
         'beginInSample': '19900101',
         'endInSample': '20201231',
@@ -340,13 +373,12 @@ def mySettings():
                 'gap': 20,
                 'dimension': 5,
                 'threshold': 0.2, ##only bollinger and linreg use threshold
-                'model': 'fib_rec' ## model: fib_rec, technicals, 
+                'model': 'moment' ## model: fib_rec, technicals, moment, sarima, volume_method
                 }
 
     if settings['model'] == 'sarima':
         with open('sarima_models.pckl', 'rb') as f:
             sarima_models = pickle.load(f)
-
         settings['sarima'] = sarima_models
 
     return settings
