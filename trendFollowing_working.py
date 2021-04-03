@@ -12,7 +12,7 @@ import pickle
 def myTradingSystem(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings):
     
     settings['day'] += 1
-    #print(DATE[-1])
+    print(DATE[-1])
     nMarkets = CLOSE.shape[1]
     #print("Using data from {} onwards to predict/take position in {}".format(DATE[0],DATE[-1]))
 
@@ -340,7 +340,7 @@ def mySettings():
                 'gap': 20,
                 'dimension': 5,
                 'threshold': 0.2, ##only bollinger and linreg use threshold
-                'model': 'sarima' ## model: fib_rec, technicals, 
+                'model': 'fib_rec' ## model: fib_rec, technicals, 
                 }
 
     if settings['model'] == 'sarima':
