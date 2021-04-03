@@ -285,7 +285,7 @@ def sarima(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings):
     sarima_models = settings['sarima']
     
     for i in range(1, nMarkets):
-        model = sarima_models[settings['markets'][i]].fit(np.log(CLOSE[-50:, i]))
+        model = sarima_models[settings['markets'][i]].fit(np.log(CLOSE[-100:, i]))
         fore = model.predict(1)[0]
         if fore > np.log(CLOSE[-1, i]):
             pos[i] = 1
