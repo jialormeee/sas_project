@@ -91,6 +91,9 @@ def myTradingSystem(DATE, OPEN, HIGH, LOW, CLOSE, VOL, USA_ADP, USA_EARN, USA_HR
         indicators = np.concatenate((USA_ADP, USA_EARN, USA_HRS, USA_BOT, USA_BC, USA_BI, USA_CU, USA_CF, USA_CHJC, USA_CFNAI, USA_CP, USA_CCR, USA_CPI, USA_CCPI, USA_CINF, USA_DFMI, USA_DUR, USA_DURET, USA_EXPX, USA_EXVOL, USA_FRET, USA_FBI, USA_GBVL, USA_GPAY, USA_HI, USA_IMPX, USA_IMVOL, USA_IP, USA_IPMOM, USA_CPIC, USA_CPICM, USA_JBO, USA_LFPR, USA_LEI, USA_MPAY, USA_MP, USA_NAHB, USA_NLTTF, USA_NFIB, USA_NFP, USA_NMPMI, USA_NPP, USA_EMPST, USA_PHS, USA_PFED, USA_PP, USA_PPIC, USA_RSM, USA_RSY, USA_RSEA, USA_RFMI, USA_TVS, USA_UNR, USA_WINV), axis=1)
         return sarimax(DATE, OPEN, HIGH, LOW, CLOSE, VOL, indicators, exposure, equity, settings)
 
+    elif settings['model'] == 'sarima_tech':
+        return sarima_tech(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings)
+
 #on-balance vol indicator
 def OBV(closes, volumes):
     return list(ta.volume.OnBalanceVolumeIndicator(pd.Series(closes), pd.Series(volumes)).on_balance_volume())
@@ -339,6 +342,158 @@ def sarimax(DATE, OPEN, HIGH, LOW, CLOSE, VOL, indicators, exposure, equity, set
 
     return weights, settings
 
+def sarima_tech(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings):
+
+    nMarkets = CLOSE.shape[1]
+    markets = settings['markets']
+    pos= np.zeros(nMarkets)
+    sarima_models = settings['sarima']
+    
+    for i in range(1, nMarkets):
+        model = sarima_models[settings['markets'][i]].fit(np.log(CLOSE[-100:, i]))
+        fore = model.predict(1)[0]
+        if fore > np.log(CLOSE[-1, i]):
+            pos[i] = 1
+        else:
+            pos[i] = -1
+
+    f = open('weights_list_sarima.txt', 'r')
+    weights_list = []
+    line = f.readline()
+    while len(line) != 0:
+        weights_list.append(int(line.strip()))
+        line = f.readline()
+
+    weights = np.zeros(nMarkets)
+    for i in range(1, nMarkets):
+        weights[i] = pos[i]*weights_list[i]/sum(weights_list)
+
+    '''Adjust weights further using technical indicators'''
+    CLOSE = np.transpose(CLOSE)
+    VOL = np.transpose(VOL)
+    # SMA
+    '''
+    Baseline indicator
+    Compare short-term (sma50) and long-term (sma200) price.
+    '''
+    sma200=np.nansum(CLOSE[:,-200:],axis=1)/200 
+    sma50=np.nansum(CLOSE[:,-50:],axis=1)/50
+    
+
+    # MACD
+    '''
+    Trend indicator
+    If the MACD lines are above zero for a sustained period of time,
+    the stock is likely trending upwards. Conversely,
+    if the MACD lines are below zero for a sustained period of time,
+    the trend is likely down.
+    '''
+    def MACD(closes):
+        return list(ta.trend.macd(pd.Series(closes)))
+
+    MACDs = [MACD(close) for close in CLOSE]
+    MACDs = np.array([np.array(a) for a in MACDs])
+    
+
+    # OBV
+    '''
+    Trend indicator
+    A rising price should be accompanied by a rising OBV;
+    a falling price should be accompanied by a falling OBV.
+    '''
+    def OBV(closes, volumes):
+        return list(ta.volume.OnBalanceVolumeIndicator(pd.Series(closes), pd.Series(volumes)).on_balance_volume())
+
+    OBVs = [OBV(close,vol) for close,vol in zip(CLOSE,VOL)]
+    OBVs = np.array([np.array(a) for a in OBVs])
+    
+
+    # RSI
+    '''
+    Momentum indicator
+    One way to interpret the RSI is by viewing the price as overbought
+    when the indicator in the histogram is above 70,
+    and viewing the price as oversold when the indicator is below 30.
+    '''
+    
+    def RSI(closes):
+        return list(ta.momentum.RSIIndicator(pd.Series(closes)).rsi())
+
+    RSIs = [RSI(close) for close in CLOSE]
+    RSIs = np.array([np.array(a) for a in RSIs])
+    
+    
+    # BB
+    '''
+    Volatility indicator, allowing price to move within a range.
+    But if the price is closer to the higher band, it is considered overbought.
+    If the price is closer to the lower band, it is considered oversold.
+    '''
+    def BB_high(closes, period):
+        return list(ta.volatility.BollingerBands(pd.Series(closes), period).bollinger_hband_indicator())
+
+    def BB_low(closes, period):
+        return list(ta.volatility.BollingerBands(pd.Series(closes), period).bollinger_lband_indicator())
+
+    BBHs = [BB_high(close,20) for close in CLOSE]
+    BBHs = np.array([np.array(a) for a in BBHs])
+
+    BBLs = [BB_low(close,20) for close in CLOSE]
+    BBLs = np.array([np.array(a) for a in BBLs])
+
+
+    # Trading Strategy
+    '''
+    Deciding LongEquity:
+    baseline is sma50>sma200
+    identify upward trend using MACD and OBV
+    identify oversold market using RSI and BB
+    buy if either baseline or upward trend or oversold is satisfied.
+    '''
+    uptrend = np.logical_or(np.all(MACDs[:,-7:] > 0), OBVs[:,-1] > OBVs[:,-2])
+    oversold = np.logical_or(RSIs[:,-1] < 30, BBLs[:,-1]==1)
+    longEquity = np.logical_or(sma50 > sma200, oversold, uptrend)
+
+    '''
+    Deciding ShortEquity:
+    identify downward trend using MACD and OBV
+    identify overbought market using RSI and BB
+    sell only when both downward trend and overbought
+    '''
+    downtrend = np.logical_or(np.all(MACDs[:,-7:] < 0), OBVs[:,-1] < OBVs[:,-2])
+    overbought = np.logical_or(RSIs[:,-1] > 70, BBHs[:,-1]==1)
+    shortEquity = np.logical_and(downtrend, overbought)
+
+    '''
+    Identify buy signal and sell signal using RSI
+    buy signal when RSI crosses over to above 50
+    sell signal when RSI crosses over to below 50
+    '''
+    buy_signal = np.logical_and(RSIs[:,-2]<50, RSIs[:,-1]>50)
+    sell_signal = np.logical_and(RSIs[:,-2]>50, RSIs[:,-1]<50)
+
+    '''LongEquity, buy_signal, sell_signal -0.3481, 4.1786'''
+    for i in range(1, nMarkets):
+        if longEquity[i]:
+            weights[i] += 0.01
+        elif buy_signal[i]:
+            weights[i] += 0.005
+        elif sell_signal[i]:
+            weights[i] -= 0.005
+
+    '''LongEquity, ShortEquity, buy_signal, sell_signal -0.3876, 4.0894
+    for i in range(1, nMarkets):
+        if longEquity[i]:
+            weights[i] += 0.01
+        elif buy_signal[i]:
+            weights[i] += 0.005
+        elif shortEquity[i]:
+            weights[i] -= 0.01
+        elif sell_signal[i]:
+            weights[i] -= 0.005
+    '''
+    
+    return weights, settings
 
 def mySettings():
     ''' Define your trading system settings here '''
@@ -376,10 +531,16 @@ def mySettings():
                 'gap': 20,
                 'dimension': 5,
                 'threshold': 0.2, ##only bollinger and linreg use threshold
-                'model': 'sarimax' ## model: fib_rec, technicals, 
+                'model': 'sarima_tech' ## model: fib_rec, technicals, 
                 }
 
     if settings['model'] == 'sarima':
+        with open('sarima_models.pckl', 'rb') as f:
+            sarima_models = pickle.load(f)
+
+        settings['sarima'] = sarima_models
+
+    if settings['model'] == 'sarima_tech':
         with open('sarima_models.pckl', 'rb') as f:
             sarima_models = pickle.load(f)
 
