@@ -8,6 +8,7 @@ from sklearn.preprocessing import PolynomialFeatures
 from sklearn.linear_model import LinearRegression
 #from pmdarima.arima import auto_arima
 import pickle
+from pmdarima.arima import auto_arima
 
 #main driving function 
 def myTradingSystem(DATE, OPEN, HIGH, LOW, CLOSE, VOL, USA_ADP, USA_EARN, USA_HRS, USA_BOT, USA_BC, USA_BI, USA_CU, USA_CF, USA_CHJC, USA_CFNAI, USA_CP, USA_CCR, USA_CPI, USA_CCPI, USA_CINF, USA_DFMI, USA_DUR, USA_DURET, USA_EXPX, USA_EXVOL, USA_FRET, USA_FBI, USA_GBVL, USA_GPAY, USA_HI, USA_IMPX, USA_IMVOL, USA_IP, USA_IPMOM, USA_CPIC, USA_CPICM, USA_JBO, USA_LFPR, USA_LEI, USA_MPAY, USA_MP, USA_NAHB, USA_NLTTF, USA_NFIB, USA_NFP, USA_NMPMI, USA_NPP, USA_EMPST, USA_PHS, USA_PFED, USA_PP, USA_PPIC, USA_RSM, USA_RSY, USA_RSEA, USA_RFMI, USA_TVS, USA_UNR, USA_WINV, exposure, equity, settings):
@@ -96,6 +97,9 @@ def myTradingSystem(DATE, OPEN, HIGH, LOW, CLOSE, VOL, USA_ADP, USA_EARN, USA_HR
 
     elif settings['model'] == 'moment':
         return moment(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings)
+
+    elif settings['model'] == 'sarima_industry':
+        return sarima_industry(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings)
 
 def moment(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings):
     nMarkets=CLOSE.shape[1]
@@ -529,6 +533,53 @@ def sarima_tech(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings):
     
     return weights, settings
 
+def sarima_industry(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings):
+
+    industry_dict_inv = {'F_BC': 'energy', 'F_BG': 'energy', 'F_BO': 'energy', 'F_CL': 'energy', 'F_HO': 'energy', 'F_NG': 'energy', 'F_RB': 'energy', 'F_GC': 'metals', 'F_HG': 'metals', 'F_PA': 'metals', 'F_PL': 'metals', 'F_SI': 'metals', 'F_C': 'agriculture', 'F_CC': 'agriculture', 'F_CT': 'agriculture', 'F_FC': 'agriculture', 'F_KC': 'agriculture', 'F_LB': 'agriculture', 'F_LC': 'agriculture', 'F_LN': 'agriculture', 'F_NR': 'agriculture', 'F_O': 'agriculture', 'F_OJ': 'agriculture', 'F_S': 'agriculture', 'F_SB': 'agriculture', 'F_SM': 'agriculture', 'F_W': 'agriculture', 'F_AE': 'indices', 'F_AH': 'indices', 'F_AX': 'indices', 'F_CA': 'indices', 'F_CF': 'bond', 'F_DM': 'indices', 'F_DX': 'indices', 'F_FB': 'indices', 'F_FP': 'indices', 'F_FY': 'indices', 'F_LX': 'indices', 'F_MD': 'indices', 'F_NQ': 'indices', 'F_NY': 'indices', 'F_RU': 'indices', 'F_SX': 'indices', 'F_VX': 'indices', 'F_YM': 'indices', 'F_XX': 'indices', 'F_EB': 'bond', 'F_F': 'bond', 'F_FV': 'bond', 'F_GS': 'bond', 'F_GX': 'bond', 'F_SS': 'bond', 'F_TU': 'bond', 'F_TY': 'bond', 'F_UB': 'bond', 'F_US': 'bond', 'F_ZQ': 'bond', 'F_AD': 'currency', 'F_BP': 'currency', 'F_CD': 'currency', 'F_ED': 'currency', 'F_JY': 'currency', 'F_LR': 'currency', 'F_MP': 'currency', 'F_ND': 'currency', 'F_RR': 'currency', 'F_SF': 'currency', 'F_TR': 'currency', 'F_EC': 'others', 'F_ES': 'others', 'F_DT': 'others', 'F_UZ': 'others', 'F_DL': 'others', 'F_LU': 'others', 'F_DZ': 'others', 'F_FL': 'others', 'F_FM': 'others', 'F_HP': 'others', 'F_LQ': 'others', 'F_PQ': 'others', 'F_RF': 'others', 'F_RP': 'others', 'F_RY': 'others', 'F_SH': 'others', 'F_VF': 'others', 'F_VT': 'others', 'F_VW': 'others', 'F_GD': 'others'}
+
+    nMarkets = CLOSE.shape[1]
+    markets = settings['markets']
+    pos= np.zeros(nMarkets)
+    pos_ind= np.zeros(nMarkets)
+    sarima_models = settings['sarima']
+    sarima_models_ind = settings['sarima_industry']
+    
+    for i in range(1, nMarkets):
+        model = sarima_models[settings['markets'][i]].fit(np.log(CLOSE[-100:, i]))
+        fore = model.predict(1)[0]
+        if fore > np.log(CLOSE[-1, i]):
+            pos[i] = 1
+        else:
+            pos[i] = -1
+
+    f = open('weights_list_sarima.txt', 'r')
+    weights_list = []
+    line = f.readline()
+    while len(line) != 0:
+        weights_list.append(int(line.strip()))
+        line = f.readline()
+
+    for i in range(1, nMarkets):
+        model = sarima_models_ind[industry_dict_inv[markets[i]]].fit(np.log(CLOSE[-100:, i]))
+        fore = model.predict(1)[0]
+        if fore > np.log(CLOSE[-1, i]):
+            pos_ind[i] = 1
+        else:
+            pos_ind[i] = -1
+
+    f = open('weights_list_industry.txt', 'r')
+    weights_list_ind = []
+    line = f.readline()
+    while len(line) != 0:
+        weights_list_ind.append(int(line.strip()))
+        line = f.readline()
+
+    weights = np.zeros(nMarkets)
+    for i in range(1, nMarkets):
+        weights[i] = pos[i]*weights_list[i] + pos_ind[i]*weights_list_ind[i]
+
+    return weights, settings
+
 def mySettings():
     ''' Define your trading system settings here '''
     markets = ['CASH', 'F_AD', 'F_BO', 'F_BP', 'F_C', 'F_CC', 'F_CD', 'F_CL', 'F_CT', 
@@ -564,10 +615,10 @@ def mySettings():
                 'gap': 20,
                 'dimension': 5,
                 'threshold': 0.2, ##only bollinger and linreg use threshold
-                'model': 'sarimax' ## model: fib_rec, technicals, moment, sarima, volume_method
+                'model': 'sarima_industry' ## model: fib_rec, technicals, moment, sarima, volume_method
                 }
 
-    if settings['model'] == 'sarima':
+    if settings['model'] == 'sarima' or settings['model'] == 'sarima_industry':
         with open('sarima_models.pckl', 'rb') as f:
             sarima_models = pickle.load(f)
         settings['sarima'] = sarima_models
@@ -577,6 +628,11 @@ def mySettings():
             sarima_models = pickle.load(f)
 
         settings['sarima'] = sarima_models
+
+    if settings['model'] == 'sarima_industry':
+        with open('sarima_models_ind.pckl', 'rb') as f:
+            sarima_models_ind = pickle.load(f)
+        settings['sarima_industry'] = sarima_models_ind
 
     return settings
 
