@@ -209,7 +209,18 @@ def linear_regression(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, setti
         except ValueError:
             pos[market] = .0
 
-    return pos, settings
+    f = open('weights_list_linreg.txt', 'r')
+    weights_list = []
+    line = f.readline()
+    while len(line) != 0:
+        weights_list.append(int(line.strip()))
+        line = f.readline()
+
+    weights = np.zeros(nMarkets)
+    for i in range(1, nMarkets):
+        weights[i] = pos[i]*weights_list[i]/sum(weights_list)
+
+    return weights, settings
 
 #quantiacs sample code also
 def predict(momentum, CLOSE, lookback, gap, dimension):
@@ -694,7 +705,7 @@ def mySettings():
                 'gap': 20,
                 'dimension': 5,
                 'threshold': 0.2, ##only bollinger and linreg use threshold
-                'model': 'sarima_auto' ## model: fib_rec, technicals, moment, sarima, volume_method
+                'model': 'linreg' ## model: fib_rec, technicals, moment, sarima, volume_method
                 }
 
     if settings['model'] == 'sarima' or settings['model'] == 'sarima_industry':
