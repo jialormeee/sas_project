@@ -2,20 +2,20 @@ import numpy as np
 import pandas as pd 
 import ta
 import statistics as st
+import tensorflow
+import math
+import pickle
 from sklearn import svm
 from sklearn import linear_model
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.linear_model import LinearRegression
-import pickle
 from pmdarima.arima import auto_arima
-import math
 from keras.models import Sequential
 from keras.layers import Dense
 from keras.layers import LSTM
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics import mean_squared_error
 from keras.layers import Dropout
-import tensorflow
 from keras.models import model_from_json
 
 #main driving function 
@@ -56,28 +56,6 @@ def myTradingSystem(DATE, OPEN, HIGH, LOW, CLOSE, VOL, USA_ADP, USA_EARN, USA_HR
     elif settings['model'] =="fib_rec":
         return fib_retrac(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings)
 
-    elif settings['model'] =="volume_method":
-        nMarkets=CLOSE.shape[1]
-        pos = np.zeros(nMarkets)
-        OBVs = [OBV(close,vol) for close,vol in zip(CLOSE,VOL)]
-        def bullish_trend(obv):
-            return (obv[-1] > obv[-2]) and (obv[-2] > obv[-3])
-        def bearish_trend(obv):
-            return (obv[-1] < obv[-2]) and (obv[-2] < obv[-3])
-
-        OBV_bull = [True if bullish_trend(obv) else False for obv in OBVs]
-        OBV_bear = [True if bearish_trend(obv) else False for obv in OBVs]
-        
-        for i in range(0, nMarkets):
-            # if bullish take long position
-            if OBV_bull[i] == True:
-                pos[i+1] = 1
-            # if bearish take short position
-            elif OBV_bear[i] == True:
-                pos[i+1] = -1
-        weights = pos/np.nansum(abs(pos))
-        return (weights, settings)
-
     elif settings['model'] == 'sarima':
         return sarima(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings)
 
@@ -100,6 +78,8 @@ def myTradingSystem(DATE, OPEN, HIGH, LOW, CLOSE, VOL, USA_ADP, USA_EARN, USA_HR
     elif settings['model'] == 'lstm':
         return lstm(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings)
 
+
+##simple momentum trade based on price strength or weakness=
 def moment(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings):
     nMarkets=CLOSE.shape[1]
     lookback=150
@@ -130,10 +110,6 @@ def moment(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings):
 
     weights = pos/np.nansum(abs(pos))
     return (weights, settings)
-
-#on-balance vol indicator
-def OBV(closes, volumes):
-    return list(ta.volume.OnBalanceVolumeIndicator(pd.Series(closes), pd.Series(volumes)).on_balance_volume())
 
 #fib-retracement 
 def fib_retrac(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings):
@@ -233,7 +209,7 @@ def predict(momentum, CLOSE, lookback, gap, dimension):
 
     return clf.predict(momentum[-dimension:].T)
 
-#added technicals yq
+#technical indicators combined 
 def technicals(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings):
     nMarkets=CLOSE.shape[1]
     pos=np.zeros(nMarkets)
@@ -327,6 +303,7 @@ def technicals(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings):
     
     return pos, settings
 
+#sarima pre-trained 
 def sarima(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings):
 
     nMarkets = CLOSE.shape[1]
@@ -358,6 +335,7 @@ def sarima(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings):
 
     return weights, settings
 
+#sarima ots-train 
 def sarima_auto(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings):
 
     nMarkets = CLOSE.shape[1]
@@ -381,6 +359,7 @@ def sarima_auto(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings):
 
     return pos, settings
 
+#improved sarima 
 def sarimax(DATE, OPEN, HIGH, LOW, CLOSE, VOL, indicators, exposure, equity, settings):
 
     nMarkets = CLOSE.shape[1]
@@ -414,6 +393,7 @@ def sarimax(DATE, OPEN, HIGH, LOW, CLOSE, VOL, indicators, exposure, equity, set
 
     return weights, settings
 
+#improved sarima combining with technical indicators
 def sarima_tech(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings):
 
     nMarkets = CLOSE.shape[1]
@@ -570,6 +550,7 @@ def sarima_tech(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings):
     
     return weights, settings
 
+#sarima infused with industry features 
 def sarima_industry(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings):
 
     industry_dict_inv = {'F_BC': 'energy', 'F_BG': 'energy', 'F_BO': 'energy', 'F_CL': 'energy', 'F_HO': 'energy', 'F_NG': 'energy', 'F_RB': 'energy', 'F_GC': 'metals', 'F_HG': 'metals', 'F_PA': 'metals', 'F_PL': 'metals', 'F_SI': 'metals', 'F_C': 'agriculture', 'F_CC': 'agriculture', 'F_CT': 'agriculture', 'F_FC': 'agriculture', 'F_KC': 'agriculture', 'F_LB': 'agriculture', 'F_LC': 'agriculture', 'F_LN': 'agriculture', 'F_NR': 'agriculture', 'F_O': 'agriculture', 'F_OJ': 'agriculture', 'F_S': 'agriculture', 'F_SB': 'agriculture', 'F_SM': 'agriculture', 'F_W': 'agriculture', 'F_AE': 'indices', 'F_AH': 'indices', 'F_AX': 'indices', 'F_CA': 'indices', 'F_CF': 'bond', 'F_DM': 'indices', 'F_DX': 'indices', 'F_FB': 'indices', 'F_FP': 'indices', 'F_FY': 'indices', 'F_LX': 'indices', 'F_MD': 'indices', 'F_NQ': 'indices', 'F_NY': 'indices', 'F_RU': 'indices', 'F_SX': 'indices', 'F_VX': 'indices', 'F_YM': 'indices', 'F_XX': 'indices', 'F_EB': 'bond', 'F_F': 'bond', 'F_FV': 'bond', 'F_GS': 'bond', 'F_GX': 'bond', 'F_SS': 'bond', 'F_TU': 'bond', 'F_TY': 'bond', 'F_UB': 'bond', 'F_US': 'bond', 'F_ZQ': 'bond', 'F_AD': 'currency', 'F_BP': 'currency', 'F_CD': 'currency', 'F_ED': 'currency', 'F_JY': 'currency', 'F_LR': 'currency', 'F_MP': 'currency', 'F_ND': 'currency', 'F_RR': 'currency', 'F_SF': 'currency', 'F_TR': 'currency', 'F_EC': 'others', 'F_ES': 'others', 'F_DT': 'others', 'F_UZ': 'others', 'F_DL': 'others', 'F_LU': 'others', 'F_DZ': 'others', 'F_FL': 'others', 'F_FM': 'others', 'F_HP': 'others', 'F_LQ': 'others', 'F_PQ': 'others', 'F_RF': 'others', 'F_RP': 'others', 'F_RY': 'others', 'F_SH': 'others', 'F_VF': 'others', 'F_VT': 'others', 'F_VW': 'others', 'F_GD': 'others'}
@@ -622,6 +603,7 @@ def sarima_industry(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, setting
         weights[i] = pos[i]*weights_list[i] + pos_ind[i]*weights_list_ind[i]
 
     return weights, settings
+
 
 def lstm(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings):
     scaler = MinMaxScaler(feature_range=(0, 1))
@@ -687,9 +669,8 @@ def mySettings():
         'beginInSample': '20180101',
         'endInSample': '20201231',
     }
-    ###this date portion is abit weird 
+    
     test_date = {
-        # 'beginInSample': '20190123',
         'beginInSample': '20190123',
         'endInSample': '20210331',
     }
@@ -704,8 +685,11 @@ def mySettings():
                 'day': 0,
                 'gap': 20,
                 'dimension': 5,
-                'threshold': 0.2, ##only bollinger and linreg use threshold
-                'model': 'linreg' ## model: fib_rec, technicals, moment, sarima, volume_method
+                'threshold': 0.2, ##only linreg use threshold
+                'model': 'linreg' 
+                ## model: fib_rec, technicals, moment, sarima, sarima_auto, 
+                ## sarimax, sarima_tech, sarima_industry, lstm,
+                ## linreg, svm
                 }
 
     if settings['model'] == 'sarima' or settings['model'] == 'sarima_industry':
