@@ -498,7 +498,7 @@ def sarima_tech(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings):
     '''LongEquity, buy_signal, sell_signal -0.3481, 4.1786'''
     for i in range(1, nMarkets):
         if longEquity[i]:
-            weights[i] += 0.025
+            weights[i] += 0.020
         elif buy_signal[i]:
             weights[i] += 0.005
         elif sell_signal[i]:
