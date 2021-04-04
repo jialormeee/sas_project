@@ -82,10 +82,10 @@ def moment(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings):
         elif currentPrice > pastPrice:
             ### seeing that price is higher than mean, upward trend, take heavy long position
             if currentPrice > sma_mean:
-                pos[0, market] = 1
+                pos[0, market] = 0.25
             ### seeing that price is higher than mean + var, upward trend but slightly more risk-averse, take slightly heavy long position
             elif currentPrice > sma_mean + sma_var:
-                pos[0, market] = 0.75
+                pos[0, market] = 0.10
 
     weights = pos/np.nansum(abs(pos))
     return (weights, settings)
@@ -521,7 +521,7 @@ def sarima_tech(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings):
 #sarima infused with industry features 
 def sarima_industry(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings):
 
-    industry_dict_inv = {'F_BC': 'energy', 'F_BG': 'energy', 'F_BO': 'energy', 'F_CL': 'energy', 'F_HO': 'energy', 'F_NG': 'energy', 'F_RB': 'energy', 'F_GC': 'metals', 'F_HG': 'metals', 'F_PA': 'metals', 'F_PL': 'metals', 'F_SI': 'metals', 'F_C': 'agriculture', 'F_CC': 'agriculture', 'F_CT': 'agriculture', 'F_FC': 'agriculture', 'F_KC': 'agriculture', 'F_LB': 'agriculture', 'F_LC': 'agriculture', 'F_LN': 'agriculture', 'F_NR': 'agriculture', 'F_O': 'agriculture', 'F_OJ': 'agriculture', 'F_S': 'agriculture', 'F_SB': 'agriculture', 'F_SM': 'agriculture', 'F_W': 'agriculture', 'F_AE': 'indices', 'F_AH': 'indices', 'F_AX': 'indices', 'F_CA': 'indices', 'F_CF': 'bond', 'F_DM': 'indices', 'F_DX': 'indices', 'F_FB': 'indices', 'F_FP': 'indices', 'F_FY': 'indices', 'F_LX': 'indices', 'F_MD': 'indices', 'F_NQ': 'indices', 'F_NY': 'indices', 'F_RU': 'indices', 'F_SX': 'indices', 'F_VX': 'indices', 'F_YM': 'indices', 'F_XX': 'indices', 'F_EB': 'bond', 'F_F': 'bond', 'F_FV': 'bond', 'F_GS': 'bond', 'F_GX': 'bond', 'F_SS': 'bond', 'F_TU': 'bond', 'F_TY': 'bond', 'F_UB': 'bond', 'F_US': 'bond', 'F_ZQ': 'bond', 'F_AD': 'currency', 'F_BP': 'currency', 'F_CD': 'currency', 'F_ED': 'currency', 'F_JY': 'currency', 'F_LR': 'currency', 'F_MP': 'currency', 'F_ND': 'currency', 'F_RR': 'currency', 'F_SF': 'currency', 'F_TR': 'currency', 'F_EC': 'others', 'F_ES': 'others', 'F_DT': 'others', 'F_UZ': 'others', 'F_DL': 'others', 'F_LU': 'others', 'F_DZ': 'others', 'F_FL': 'others', 'F_FM': 'others', 'F_HP': 'others', 'F_LQ': 'others', 'F_PQ': 'others', 'F_RF': 'others', 'F_RP': 'others', 'F_RY': 'others', 'F_SH': 'others', 'F_VF': 'others', 'F_VT': 'others', 'F_VW': 'others', 'F_GD': 'others'}
+    industry_dict_inv = {'F_BC': 'energy', 'F_BG': 'energy', 'F_BO': 'energy', 'F_CL': 'energy', 'F_HO': 'energy', 'F_NG': 'energy', 'F_RB': 'energy', 'F_GC': 'metals', 'F_HG': 'metals', 'F_PA': 'metals', 'F_PL': 'metals', 'F_SI': 'metals', 'F_C': 'agriculture', 'F_CC': 'agriculture', 'F_CT': 'agriculture', 'F_FC': 'agriculture', 'F_KC': 'agriculture', 'F_LB': 'agriculture', 'F_LC': 'agriculture', 'F_LN': 'agriculture', 'F_NR': 'agriculture', 'F_O': 'agriculture', 'F_OJ': 'agriculture', 'F_S': 'agriculture', 'F_SB': 'agriculture', 'F_SM': 'agriculture', 'F_W': 'agriculture', 'F_AE': 'indexes', 'F_AH': 'indexes', 'F_AX': 'indexes', 'F_CA': 'indexes', 'F_CF': 'bond', 'F_DM': 'indexes', 'F_DX': 'indexes', 'F_FB': 'indexes', 'F_FP': 'indexes', 'F_FY': 'indexes', 'F_LX': 'indexes', 'F_MD': 'indexes', 'F_NQ': 'indexes', 'F_NY': 'indexes', 'F_RU': 'indexes', 'F_SX': 'indexes', 'F_VX': 'indexes', 'F_YM': 'indexes', 'F_XX': 'indexes', 'F_EB': 'bond', 'F_F': 'bond', 'F_FV': 'bond', 'F_GS': 'bond', 'F_GX': 'bond', 'F_SS': 'bond', 'F_TU': 'bond', 'F_TY': 'bond', 'F_UB': 'bond', 'F_US': 'bond', 'F_ZQ': 'bond', 'F_AD': 'currency', 'F_BP': 'currency', 'F_CD': 'currency', 'F_ED': 'currency', 'F_JY': 'currency', 'F_LR': 'currency', 'F_MP': 'currency', 'F_ND': 'currency', 'F_RR': 'currency', 'F_SF': 'currency', 'F_TR': 'currency', 'F_EC': 'others', 'F_ES': 'others', 'F_DT': 'others', 'F_UZ': 'others', 'F_DL': 'others', 'F_LU': 'others', 'F_DZ': 'others', 'F_FL': 'others', 'F_FM': 'others', 'F_HP': 'others', 'F_LQ': 'others', 'F_PQ': 'others', 'F_RF': 'others', 'F_RP': 'others', 'F_RY': 'others', 'F_SH': 'others', 'F_VF': 'others', 'F_VT': 'others', 'F_VW': 'others', 'F_GD': 'others'}
 
     nMarkets = CLOSE.shape[1]
     markets = settings['markets']
@@ -572,7 +572,7 @@ def sarima_industry(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, setting
 
     return weights, settings
 
-
+#lstm
 def lstm(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings):
     scaler = MinMaxScaler(feature_range=(0, 1))
     nMarkets = CLOSE.shape[1]
@@ -654,10 +654,8 @@ def mySettings():
                 'gap': 20,
                 'dimension': 5,
                 'threshold': 0.2, ##only linreg use threshold
-                'model': 'svm' 
-                ## model: fib_rec, technicals, moment, sarima, sarima_auto, 
-                ## sarimax, sarima_tech, sarima_industry, lstm,
-                ## linreg
+                'model': 'moment' #current model used
+                ##list of models to use: fib_rec, technicals, moment, sarima, sarima_auto, sarimax, sarima_tech, sarima_industry, lstm, linreg
                 }
 
     if settings['model'] == 'sarima' or settings['model'] == 'sarima_industry':
