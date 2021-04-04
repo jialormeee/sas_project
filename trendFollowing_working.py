@@ -6,9 +6,17 @@ from sklearn import svm
 from sklearn import linear_model
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.linear_model import LinearRegression
-#from pmdarima.arima import auto_arima
 import pickle
 from pmdarima.arima import auto_arima
+import math
+from keras.models import Sequential
+from keras.layers import Dense
+from keras.layers import LSTM
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.metrics import mean_squared_error
+from keras.layers import Dropout
+import tensorflow
+from keras.models import model_from_json
 
 #main driving function 
 def myTradingSystem(DATE, OPEN, HIGH, LOW, CLOSE, VOL, USA_ADP, USA_EARN, USA_HRS, USA_BOT, USA_BC, USA_BI, USA_CU, USA_CF, USA_CHJC, USA_CFNAI, USA_CP, USA_CCR, USA_CPI, USA_CCPI, USA_CINF, USA_DFMI, USA_DUR, USA_DURET, USA_EXPX, USA_EXVOL, USA_FRET, USA_FBI, USA_GBVL, USA_GPAY, USA_HI, USA_IMPX, USA_IMVOL, USA_IP, USA_IPMOM, USA_CPIC, USA_CPICM, USA_JBO, USA_LFPR, USA_LEI, USA_MPAY, USA_MP, USA_NAHB, USA_NLTTF, USA_NFIB, USA_NFP, USA_NMPMI, USA_NPP, USA_EMPST, USA_PHS, USA_PFED, USA_PP, USA_PPIC, USA_RSM, USA_RSY, USA_RSEA, USA_RFMI, USA_TVS, USA_UNR, USA_WINV, exposure, equity, settings):
@@ -100,6 +108,9 @@ def myTradingSystem(DATE, OPEN, HIGH, LOW, CLOSE, VOL, USA_ADP, USA_EARN, USA_HR
 
     elif settings['model'] == 'sarima_industry':
         return sarima_industry(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings)
+
+    elif settings['model'] == 'lstm':
+        return lstm(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings)
 
 def moment(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings):
     nMarkets=CLOSE.shape[1]
@@ -580,6 +591,49 @@ def sarima_industry(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, setting
 
     return weights, settings
 
+def lstm(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings):
+    scaler = MinMaxScaler(feature_range=(0, 1))
+    nMarkets = CLOSE.shape[1]
+    markets = settings['markets']
+    pos= np.zeros(nMarkets)
+
+    def create_dataset(dataset, look_back=1):
+        dataX, dataY = [], []
+        for i in range(len(dataset)-look_back-1):
+            a = dataset[i:(i+look_back), 0]
+            dataX.append(a)
+            dataY.append(dataset[i + look_back, 0])
+        return np.array(dataX), np.array(dataY)
+
+    f = open('weights_list_lstm.txt', 'r')
+    weights_list = []
+    line = f.readline()
+    while len(line) != 0:
+        weights_list.append(int(line.strip()))
+        line = f.readline()
+
+    for i in range(1, nMarkets):
+        if weights_list[i] > 0:
+            dataset_test = CLOSE[:, i:i+1].astype('float32')
+            dataset_test = scaler.fit_transform(dataset_test)
+            lookback = 1
+            X_test, Y_test = create_dataset(dataset_test, lookback)
+            X_test = np.reshape(X_test, (X_test.shape[0], 1, X_test.shape[1]))
+            json_file = open('lstm_models/lstm_model_'+markets[i]+'.json', 'r')
+            loaded_model_json = json_file.read()
+            json_file.close()
+            model = model_from_json(loaded_model_json)
+            model.load_weights('lstm_models/lstm_model_'+markets[i]+'.h5')
+            pred = model.predict(X_test)
+            pred = scaler.inverse_transform(pred)
+            pos[i] = 1 if pred[-1,0] > CLOSE[-1, i] else -1
+
+    weights = np.zeros(nMarkets)
+    for i in range(1, nMarkets):
+        weights[i] = pos[i]*weights_list[i]/sum(weights_list)
+
+    return weights, settings
+
 def mySettings():
     ''' Define your trading system settings here '''
     markets = ['CASH', 'F_AD', 'F_BO', 'F_BP', 'F_C', 'F_CC', 'F_CD', 'F_CL', 'F_CT', 
@@ -615,7 +669,7 @@ def mySettings():
                 'gap': 20,
                 'dimension': 5,
                 'threshold': 0.2, ##only bollinger and linreg use threshold
-                'model': 'sarima_industry' ## model: fib_rec, technicals, moment, sarima, volume_method
+                'model': 'lstm' ## model: fib_rec, technicals, moment, sarima, volume_method
                 }
 
     if settings['model'] == 'sarima' or settings['model'] == 'sarima_industry':
