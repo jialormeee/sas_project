@@ -266,7 +266,7 @@ def technicals(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings):
     oversold = np.logical_or(RSIs[:,-1] < 30, BBLs[:,-1]==1)
     longEquity = np.logical_or(sma50 > sma200, oversold, uptrend)
 
-    pos[longEquity] = 0.2
+    pos[longEquity] = 0.5
     pos[~longEquity] = -1
     
     return pos, settings
@@ -654,7 +654,7 @@ def mySettings():
                 'gap': 20,
                 'dimension': 5,
                 'threshold': 0.2, ##only linreg use threshold
-                'model': 'sarima_tech' #current model used
+                'model': 'technicals' #current model used
                 ##list of models to use: fib_rec, technicals, moment, sarima, sarima_auto, sarimax, sarima_tech, sarima_industry, lstm, linreg
                 }
 
