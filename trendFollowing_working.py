@@ -28,27 +28,6 @@ def myTradingSystem(DATE, OPEN, HIGH, LOW, CLOSE, VOL, USA_ADP, USA_EARN, USA_HR
 
     if settings['model'] =="technicals":
         return technicals(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings)
-
-    elif settings['model'] =="svm":
-        lookback = settings['lookback']
-        dimension = settings['dimension']
-        gap = settings['gap']
-        pos = np.zeros((1, nMarkets), dtype=np.float)
-        momentum = (CLOSE[gap:, :] - CLOSE[:-gap, :]) / CLOSE[:-gap, :]
-
-        for market in range(nMarkets):
-            try:
-                pos[0, market] = predict(momentum[:, market].reshape(-1, 1),
-                                        CLOSE[:, market].reshape(-1, 1),
-                                        lookback,
-                                        gap,
-                                        dimension)
-            except ValueError:
-                pos[0, market] = .0
-        print("Positions:", pos)
-        if np.nansum(pos) > 0:
-            pos = pos / np.nansum(abs(pos))
-        return pos, settings
     
     elif settings['model'] =="linreg":
         return linear_regression(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings)
@@ -79,7 +58,7 @@ def myTradingSystem(DATE, OPEN, HIGH, LOW, CLOSE, VOL, USA_ADP, USA_EARN, USA_HR
         return lstm(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings)
 
 
-##simple momentum trade based on price strength or weakness=
+##simple momentum trade based on price strength or weakness
 def moment(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings):
     nMarkets=CLOSE.shape[1]
     lookback=150
@@ -161,7 +140,7 @@ def fib_retrac(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings):
     weights = pos/np.nansum(abs(pos))
     return (weights, settings)
 
-#quantiacs sample code also
+#linear regression model
 def linear_regression(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings):
     nMarkets = len(settings['markets'])
     lookback = settings['lookback']
@@ -197,17 +176,6 @@ def linear_regression(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, setti
         weights[i] = pos[i]*weights_list[i]/sum(weights_list)
 
     return weights, settings
-
-#quantiacs sample code also
-def predict(momentum, CLOSE, lookback, gap, dimension):
-    X = np.concatenate([momentum[i:i + dimension] for i in range(lookback - gap - dimension)], axis=1).T
-    y = np.sign((CLOSE[dimension+gap:] - CLOSE[dimension+gap-1:-1]).T[0])
-    y[y==0] = 1
-
-    clf = svm.SVC()
-    clf.fit(X, y)
-
-    return clf.predict(momentum[-dimension:].T)
 
 #technical indicators combined 
 def technicals(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings):
@@ -359,7 +327,7 @@ def sarima_auto(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings):
 
     return pos, settings
 
-#improved sarima 
+#improved sarima with exogenous inputs
 def sarimax(DATE, OPEN, HIGH, LOW, CLOSE, VOL, indicators, exposure, equity, settings):
 
     nMarkets = CLOSE.shape[1]
@@ -662,7 +630,7 @@ def mySettings():
     'F_RP', 'F_RY', 'F_SH', 'F_SX', 'F_TR', 'F_EB', 'F_VF', 'F_VT', 'F_VW', 'F_GD', 'F_F']
     
     # MODE = "TEST" / "TRAIN"
-    MODE = "TEST"
+    MODE = "TRAIN"
 
     train_date = {
         # 'beginInSample': '19900101',
@@ -686,10 +654,10 @@ def mySettings():
                 'gap': 20,
                 'dimension': 5,
                 'threshold': 0.2, ##only linreg use threshold
-                'model': 'linreg' 
+                'model': 'svm' 
                 ## model: fib_rec, technicals, moment, sarima, sarima_auto, 
                 ## sarimax, sarima_tech, sarima_industry, lstm,
-                ## linreg, svm
+                ## linreg
                 }
 
     if settings['model'] == 'sarima' or settings['model'] == 'sarima_industry':
