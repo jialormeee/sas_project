@@ -53,21 +53,6 @@ def myTradingSystem(DATE, OPEN, HIGH, LOW, CLOSE, VOL, USA_ADP, USA_EARN, USA_HR
     elif settings['model'] =="linreg":
         return linear_regression(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings)
 
-    elif settings['model'] =="bollinger":
-        nMarkets = len(settings['markets'])
-        threshold = settings['threshold']
-        pos = np.zeros((1, nMarkets), dtype=np.float)
-
-        for market in range(nMarkets):
-            sma, upperBand, lowerBand = bollingerBands(CLOSE[:, market])
-            currentPrice = CLOSE[-1, market]
-
-            if currentPrice >= upperBand + (upperBand - lowerBand) * threshold:
-                pos[0, market] = -1
-            elif currentPrice <= lowerBand - (upperBand - lowerBand) * threshold:
-                pos[0, market] = 1
-        return pos, settings
-    
     elif settings['model'] =="fib_rec":
         return fib_retrac(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings)
 
@@ -153,7 +138,8 @@ def OBV(closes, volumes):
 #fib-retracement 
 def fib_retrac(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings):
     nMarkets=CLOSE.shape[1]
-    periodLonger=10 #%[280:30:500]
+    periodLonger=200
+    periodShorter =50 
     maxminPeriod=30 
     swing_low = np.nanmin(CLOSE[-maxminPeriod,:],axis=0)
     swing_high = np.nanmax(CLOSE[-maxminPeriod,:])
@@ -224,12 +210,6 @@ def linear_regression(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, setti
             pos[market] = .0
 
     return pos, settings
-
-#quantiacs sample code also
-def bollingerBands(a, n=20):
-        sma = np.nansum(a[-n:]) / n
-        std = np.std(a[-n:], ddof=1)
-        return sma, sma + 2 * std, sma - 2 * std
 
 #quantiacs sample code also
 def predict(momentum, CLOSE, lookback, gap, dimension):
