@@ -324,12 +324,15 @@ def sarima(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings):
     sarima_models = settings['sarima']
     
     for i in range(1, nMarkets):
-        model = sarima_models[settings['markets'][i]].fit(np.log(CLOSE[-100:, i]))
-        fore = model.predict(1)[0]
-        if fore > np.log(CLOSE[-1, i]):
-            pos[i] = 1
-        else:
-            pos[i] = -1
+        try:
+            model = sarima_models[settings['markets'][i]].fit(np.log(CLOSE[-100:, i]))
+            fore = model.predict(1)[0]
+            if fore > np.log(CLOSE[-1, i]):
+                pos[i] = 1
+            else:
+                pos[i] = -1
+        except:
+            pos[i] = 0
 
     f = open('weights_list_sarima.txt', 'r')
     weights_list = []
@@ -353,14 +356,17 @@ def sarima_auto(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings):
     
     for i in range(1, nMarkets):
         # if models[markets[i]] == None:
-        model = auto_arima(np.log(CLOSE[:, i]), trace=False, suppress_warnings=True, error_action='ignore')
-            # models[markets[i]] = model
-        model = model.fit(np.log(CLOSE[:, i]), trace=False, suppress_warnings=True, error_action='ignore')
-        fore = model.predict(1)[0]
-        if fore > np.log(CLOSE[-1, i]):
-            pos[i] = 1
-        else:
-            pos[i] = -1
+        try:
+            model = auto_arima(np.log(CLOSE[:, i]), trace=False, suppress_warnings=True, error_action='ignore')
+                # models[markets[i]] = model
+            model = model.fit(np.log(CLOSE[:, i]), trace=False, suppress_warnings=True, error_action='ignore')
+            fore = model.predict(1)[0]
+            if fore > np.log(CLOSE[-1, i]):
+                pos[i] = 1
+            else:
+                pos[i] = -1
+        except:
+            pos[i] = 0
 
     return pos, settings
 
@@ -381,12 +387,15 @@ def sarimax(DATE, OPEN, HIGH, LOW, CLOSE, VOL, indicators, exposure, equity, set
     
     for i in range(1, nMarkets):
         if weights_list[i] > 0:
-            model = sarimax_models[settings['markets'][i]].fit(np.log(CLOSE[-100:, i]), exogenous = indicators[-100:, :])
-            fore = model.predict(1, exogenous = indicators[-1:, :])[0]
-            if fore > np.log(CLOSE[-1, i]):
-                pos[i] = 1
-            else:
-                pos[i] = -1
+            try:
+                model = sarimax_models[settings['markets'][i]].fit(np.log(CLOSE[-100:, i]), exogenous = indicators[-100:, :])
+                fore = model.predict(1, exogenous = indicators[-1:, :])[0]
+                if fore > np.log(CLOSE[-1, i]):
+                    pos[i] = 1
+                else:
+                    pos[i] = -1
+            except:
+                pos[i] = 0
 
     weights = np.zeros(nMarkets)
     for i in range(1, nMarkets):
@@ -402,12 +411,15 @@ def sarima_tech(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings):
     sarima_models = settings['sarima']
     
     for i in range(1, nMarkets):
-        model = sarima_models[settings['markets'][i]].fit(np.log(CLOSE[-100:, i]))
-        fore = model.predict(1)[0]
-        if fore > np.log(CLOSE[-1, i]):
-            pos[i] = 1
-        else:
-            pos[i] = -1
+        try:
+            model = sarima_models[settings['markets'][i]].fit(np.log(CLOSE[-100:, i]))
+            fore = model.predict(1)[0]
+            if fore > np.log(CLOSE[-1, i]):
+                pos[i] = 1
+            else:
+                pos[i] = -1
+        except:
+            pos[i] = 0
 
     f = open('weights_list_sarima.txt', 'r')
     weights_list = []
@@ -559,12 +571,15 @@ def sarima_industry(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, setting
     sarima_models_ind = settings['sarima_industry']
     
     for i in range(1, nMarkets):
-        model = sarima_models[settings['markets'][i]].fit(np.log(CLOSE[-100:, i]))
-        fore = model.predict(1)[0]
-        if fore > np.log(CLOSE[-1, i]):
-            pos[i] = 1
-        else:
-            pos[i] = -1
+        try:
+            model = sarima_models[settings['markets'][i]].fit(np.log(CLOSE[-100:, i]))
+            fore = model.predict(1)[0]
+            if fore > np.log(CLOSE[-1, i]):
+                pos[i] = 1
+            else:
+                pos[i] = -1
+        except:
+            pos[i] = 0
 
     f = open('weights_list_sarima.txt', 'r')
     weights_list = []
@@ -574,12 +589,15 @@ def sarima_industry(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, setting
         line = f.readline()
 
     for i in range(1, nMarkets):
-        model = sarima_models_ind[industry_dict_inv[markets[i]]].fit(np.log(CLOSE[-100:, i]))
-        fore = model.predict(1)[0]
-        if fore > np.log(CLOSE[-1, i]):
-            pos_ind[i] = 1
-        else:
-            pos_ind[i] = -1
+        try:
+            model = sarima_models_ind[industry_dict_inv[markets[i]]].fit(np.log(CLOSE[-100:, i]))
+            fore = model.predict(1)[0]
+            if fore > np.log(CLOSE[-1, i]):
+                pos_ind[i] = 1
+            else:
+                pos_ind[i] = -1
+        except:
+            pos_ind[i] = 0
 
     f = open('weights_list_industry.txt', 'r')
     weights_list_ind = []
@@ -617,19 +635,22 @@ def lstm(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings):
 
     for i in range(1, nMarkets):
         if weights_list[i] > 0:
-            dataset_test = CLOSE[:, i:i+1].astype('float32')
-            dataset_test = scaler.fit_transform(dataset_test)
-            lookback = 1
-            X_test, Y_test = create_dataset(dataset_test, lookback)
-            X_test = np.reshape(X_test, (X_test.shape[0], 1, X_test.shape[1]))
-            json_file = open('lstm_models/lstm_model_'+markets[i]+'.json', 'r')
-            loaded_model_json = json_file.read()
-            json_file.close()
-            model = model_from_json(loaded_model_json)
-            model.load_weights('lstm_models/lstm_model_'+markets[i]+'.h5')
-            pred = model.predict(X_test)
-            pred = scaler.inverse_transform(pred)
-            pos[i] = 1 if pred[-1,0] > CLOSE[-1, i] else -1
+            try:
+                dataset_test = CLOSE[:, i:i+1].astype('float32')
+                dataset_test = scaler.fit_transform(dataset_test)
+                lookback = 1
+                X_test, Y_test = create_dataset(dataset_test, lookback)
+                X_test = np.reshape(X_test, (X_test.shape[0], 1, X_test.shape[1]))
+                json_file = open('lstm_models/lstm_model_'+markets[i]+'.json', 'r')
+                loaded_model_json = json_file.read()
+                json_file.close()
+                model = model_from_json(loaded_model_json)
+                model.load_weights('lstm_models/lstm_model_'+markets[i]+'.h5')
+                pred = model.predict(X_test)
+                pred = scaler.inverse_transform(pred)
+                pos[i] = 1 if pred[-1,0] > CLOSE[-1, i] else -1
+            except: 
+                pos[i] = 0
 
     weights = np.zeros(nMarkets)
     for i in range(1, nMarkets):
