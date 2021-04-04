@@ -96,6 +96,9 @@ def myTradingSystem(DATE, OPEN, HIGH, LOW, CLOSE, VOL, USA_ADP, USA_EARN, USA_HR
     elif settings['model'] == 'sarima':
         return sarima(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings)
 
+    elif settings['model'] == 'sarima_auto':
+        return sarima_auto(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings)
+
     elif settings['model'] == 'sarimax':
         indicators = np.concatenate((USA_ADP, USA_EARN, USA_HRS, USA_BOT, USA_BC, USA_BI, USA_CU, USA_CF, USA_CHJC, USA_CFNAI, USA_CP, USA_CCR, USA_CPI, USA_CCPI, USA_CINF, USA_DFMI, USA_DUR, USA_DURET, USA_EXPX, USA_EXVOL, USA_FRET, USA_FBI, USA_GBVL, USA_GPAY, USA_HI, USA_IMPX, USA_IMVOL, USA_IP, USA_IPMOM, USA_CPIC, USA_CPICM, USA_JBO, USA_LFPR, USA_LEI, USA_MPAY, USA_MP, USA_NAHB, USA_NLTTF, USA_NFIB, USA_NFP, USA_NMPMI, USA_NPP, USA_EMPST, USA_PHS, USA_PFED, USA_PP, USA_PPIC, USA_RSM, USA_RSY, USA_RSEA, USA_RFMI, USA_TVS, USA_UNR, USA_WINV), axis=1)
         return sarimax(DATE, OPEN, HIGH, LOW, CLOSE, VOL, indicators, exposure, equity, settings)
@@ -360,6 +363,26 @@ def sarima(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings):
         weights[i] = pos[i]*weights_list[i]/sum(weights_list)
 
     return weights, settings
+
+def sarima_auto(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings):
+
+    nMarkets = CLOSE.shape[1]
+    markets = settings['markets']
+    pos= np.zeros(nMarkets)
+    # models = {el:None for el in markets[1:]}
+    
+    for i in range(1, nMarkets):
+        # if models[markets[i]] == None:
+        model = auto_arima(np.log(CLOSE[:, i]), trace=False, suppress_warnings=True, error_action='ignore')
+            # models[markets[i]] = model
+        model = model.fit(np.log(CLOSE[:, i]), trace=False, suppress_warnings=True, error_action='ignore')
+        fore = model.predict(1)[0]
+        if fore > np.log(CLOSE[-1, i]):
+            pos[i] = 1
+        else:
+            pos[i] = -1
+
+    return pos, settings
 
 def sarimax(DATE, OPEN, HIGH, LOW, CLOSE, VOL, indicators, exposure, equity, settings):
 
@@ -648,7 +671,8 @@ def mySettings():
     MODE = "TEST"
 
     train_date = {
-        'beginInSample': '19900101',
+        # 'beginInSample': '19900101',
+        'beginInSample': '20180101',
         'endInSample': '20201231',
     }
     ###this date portion is abit weird 
@@ -669,7 +693,7 @@ def mySettings():
                 'gap': 20,
                 'dimension': 5,
                 'threshold': 0.2, ##only bollinger and linreg use threshold
-                'model': 'lstm' ## model: fib_rec, technicals, moment, sarima, volume_method
+                'model': 'sarima_auto' ## model: fib_rec, technicals, moment, sarima, volume_method
                 }
 
     if settings['model'] == 'sarima' or settings['model'] == 'sarima_industry':
