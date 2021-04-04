@@ -266,7 +266,7 @@ def technicals(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings):
     oversold = np.logical_or(RSIs[:,-1] < 30, BBLs[:,-1]==1)
     longEquity = np.logical_or(sma50 > sma200, oversold, uptrend)
 
-    pos[longEquity] = 1
+    pos[longEquity] = 0.2
     pos[~longEquity] = -1
     
     return pos, settings
@@ -376,7 +376,7 @@ def sarima_tech(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings):
             if fore > np.log(CLOSE[-1, i]):
                 pos[i] = 1
             else:
-                pos[i] = -1
+                pos[i] = -0.25
         except:
             pos[i] = 0
 
@@ -498,7 +498,7 @@ def sarima_tech(DATE, OPEN, HIGH, LOW, CLOSE, VOL, exposure, equity, settings):
     '''LongEquity, buy_signal, sell_signal -0.3481, 4.1786'''
     for i in range(1, nMarkets):
         if longEquity[i]:
-            weights[i] += 0.01
+            weights[i] += 0.025
         elif buy_signal[i]:
             weights[i] += 0.005
         elif sell_signal[i]:
@@ -630,7 +630,7 @@ def mySettings():
     'F_RP', 'F_RY', 'F_SH', 'F_SX', 'F_TR', 'F_EB', 'F_VF', 'F_VT', 'F_VW', 'F_GD', 'F_F']
     
     # MODE = "TEST" / "TRAIN"
-    MODE = "TRAIN"
+    MODE = "TEST"
 
     train_date = {
         # 'beginInSample': '19900101',
@@ -654,7 +654,7 @@ def mySettings():
                 'gap': 20,
                 'dimension': 5,
                 'threshold': 0.2, ##only linreg use threshold
-                'model': 'moment' #current model used
+                'model': 'sarima_tech' #current model used
                 ##list of models to use: fib_rec, technicals, moment, sarima, sarima_auto, sarimax, sarima_tech, sarima_industry, lstm, linreg
                 }
 
